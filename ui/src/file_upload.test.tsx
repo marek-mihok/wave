@@ -35,7 +35,7 @@ describe('FileUpload.tsx', () => {
       setRequestHeader: jest.fn(),
       status,
       upload: jest.fn(),
-      responseText: JSON.stringify(data),
+      responseText: data ? JSON.stringify(data) : null,
     }
     // @ts-ignore
     window.XMLHttpRequest = jest.fn().mockImplementation(() => xhrMockObj)
