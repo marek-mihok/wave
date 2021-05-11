@@ -47,11 +47,12 @@ import { Tabs, XTabs } from './tabs'
 import { Template, XTemplate } from './template'
 import { Text, TextL, TextM, TextS, TextXl, TextXs, XText } from './text'
 import { Textbox, XTextbox } from './textbox'
-import { clas, cssVar, margin, padding } from './theme'
+import { clas, margin, padding, cssVar } from './theme'
 import { Toggle, XToggle } from './toggle'
 import { XToolTip } from './tooltip'
 import { bond } from './ui'
 import { VegaVisualization, XVegaVisualization } from './vega'
+import { Annotator, XAnnotator } from './annotator'
 
 /** Create a component. */
 export interface Component {
@@ -133,6 +134,8 @@ export interface Component {
   inline?: Inline
   /** Image */
   image?: Image
+  /** Annotator. */
+  annotator?: Annotator
 }
 
 /** Create an inline (horizontal) list of components. */
@@ -257,6 +260,7 @@ const
     if (m.stats) return <XStats model={m.stats} />
     if (m.inline) return <XInline model={m.inline} />
     if (m.image) return <XImage model={m.image} />
+    if (m.annotator) return <XAnnotator model={m.annotator} />
     return <Fluent.MessageBar messageBarType={Fluent.MessageBarType.severeWarning}>This component could not be rendered.</Fluent.MessageBar>
   }
 
