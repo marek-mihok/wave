@@ -16,6 +16,7 @@ import * as Fluent from '@fluentui/react'
 import { B, box, Id, S, wave } from 'h2o-wave'
 import React from 'react'
 import { Choice } from './choice_group'
+import { fuzzysearch } from './parts/utils'
 import { displayMixin } from './theme'
 import { bond } from './ui'
 
@@ -57,34 +58,26 @@ export interface Dropdown {
   tooltip?: S
 }
 
-export const
-  XDropdown = bond(({ model: m }: { model: Dropdown }) => {
-    const isMultivalued = !!m.values
-    wave.args[m.name] = isMultivalued
-      ? (m.values || [])
-      : (m.value || null)
-
+const
+  BaseDropdown = bond(({ model, isMultivalued }: { model: Dropdown, isMultivalued: B }) => {
     const
-      selection = isMultivalued ? new Set<S>(m.values) : null,
+      selection = isMultivalued ? new Set<S>(model.values) : null,
       selectedOptionsB = box(Array.from(selection || [])),
-      options = (m.choices || []).map(({ name, label, disabled }): Fluent.IDropdownOption => ({ key: name, text: label || name, disabled })),
+      options = (model.choices || []).map(({ name, label, disabled }): Fluent.IDropdownOption => ({ key: name, text: label || name, disabled })),
       onChange = (_e?: React.FormEvent<HTMLElement>, option?: Fluent.IDropdownOption) => {
         if (option) {
           const name = option.key as S
           if (isMultivalued && selection !== null) {
-            if (option.selected) {
-              selection.add(name)
-            } else {
-              selection.delete(name)
-            }
+            option.selected ? selection.add(name) : selection.delete(name)
+
             const selectedOpts = Array.from(selection)
-            wave.args[m.name] = selectedOpts
+            wave.args[model.name] = selectedOpts
             selectedOptionsB(selectedOpts)
           } else {
-            wave.args[m.name] = name
+            wave.args[model.name] = name
           }
         }
-        if (m.trigger) wave.sync()
+        if (model.trigger) wave.sync()
       },
       selectAll = () => {
         if (!selection) return
@@ -94,7 +87,7 @@ export const
 
         const selectionArr = Array.from(selection)
         selectedOptionsB(selectionArr)
-        wave.args[m.name] = selectionArr
+        wave.args[model.name] = selectionArr
 
         onChange()
       },
@@ -103,33 +96,138 @@ export const
 
         selection.clear()
         selectedOptionsB([])
-        wave.args[m.name] = []
+        wave.args[model.name] = []
 
         onChange()
       },
-      render = () =>
-        <div style={displayMixin(m.visible)}>
+      render = () => (
+        <>
           <Fluent.Dropdown
-            data-test={m.name}
-            label={m.label}
-            placeholder={m.placeholder}
+            data-test={model.name}
+            label={model.label}
+            placeholder={model.placeholder}
             options={options}
-            required={m.required}
-            disabled={m.disabled}
+            required={model.required}
+            disabled={model.disabled}
             multiSelect={isMultivalued || undefined}
-            defaultSelectedKey={!isMultivalued ? m.value : undefined}
+            defaultSelectedKey={!isMultivalued ? model.value : undefined}
             selectedKeys={isMultivalued ? selectedOptionsB() : undefined}
             onChange={onChange}
           />
           {
             isMultivalued &&
-            <div>
-              <Fluent.Text variant='small'>
-                <Fluent.Link onClick={selectAll}>Select All</Fluent.Link> | <Fluent.Link onClick={deselectAll}>Deselect All</Fluent.Link>
-              </Fluent.Text>
-            </div>
+            <Fluent.Text variant='small'>
+              <Fluent.Link onClick={selectAll}>Select All</Fluent.Link> | <Fluent.Link onClick={deselectAll}>Deselect All</Fluent.Link>
+            </Fluent.Text>
           }
-        </div>
+        </>
+      )
 
     return { render, selectedOptionsB }
+  }),
+  DialogDropdown = bond(({ model, isMultivalued }: { model: Dropdown, isMultivalued: B }) => {
+    const
+      isDialogHiddenB = box(true),
+      items = model.choices?.map(({ name, label }) => ({ key: name, text: label || name })) || [],
+      selection = new Fluent.Selection<Fluent.IObjectWithKey & { text?: S }>({ items }),
+      initialSelectionB = box<S[]>([]),
+      filteredItemsB = box(items),
+      labelB = box(''),
+      toggleDialog = () => isDialogHiddenB(!isDialogHiddenB()),
+      cancelDialog = () => {
+        isDialogHiddenB(true)
+        selection.setAllSelected(false)
+        initialSelectionB().forEach(k => selection.setKeySelected(k, true, false))
+      },
+      submit = () => {
+        const result = selection.getSelection().map(({ key }) => key as S)
+        wave.args[model.name] = result.length === 1 ? result[0] : result
+
+        if (model.trigger) wave.sync()
+        labelB(selection.getSelectedCount() ? selection.getSelection().map(({ text }) => text).join(', ') : 'Select ...')
+        toggleDialog()
+        initialSelectionB([...selection.getSelection().map(({ key }) => key as S)])
+      },
+      selectAll = () => model.choices?.forEach(({ name }) => selection.setKeySelected(name, true, false)),
+      deselectAll = () => model.choices?.forEach(({ name }) => selection.setKeySelected(name, false, false)),
+      onSearchChange = (_e?: React.ChangeEvent<HTMLInputElement>, newVal = '') => filteredItemsB(items.filter(({ text }) => fuzzysearch(text, newVal))),
+      onRenderDetailsHeader = (props?: Fluent.IDetailsHeaderProps, defaultRender?: (props?: Fluent.IDetailsHeaderProps) => JSX.Element | null): JSX.Element | null =>
+        !props || !defaultRender ? null : <Fluent.Sticky stickyPosition={Fluent.StickyPositionType.Header} isScrollSynced>{defaultRender(props)}</Fluent.Sticky>,
+      init = () => {
+        if (!model.values?.length && !model.value) return
+
+        const itemsMap = new Map<S, S>()
+        items.forEach(({ key, text }) => itemsMap.set(key, text))
+
+        if (model.values?.length) {
+          model.values.forEach(v => selection.setKeySelected(v, true, false))
+          labelB(model.values.map(v => itemsMap.get(v) || '').filter(Boolean).join(', ') || labelB())
+          initialSelectionB().push(...model.values)
+        }
+        if (model.value) {
+          selection.setKeySelected(model.value, true, false)
+          labelB(itemsMap.get(model.value) || labelB())
+          initialSelectionB().push(model.value)
+        }
+      },
+      render = () => (
+        <>
+          <Fluent.TextField
+            data-test={model.name}
+            iconProps={{ iconName: 'ChevronDown' }}
+            readOnly
+            onClick={toggleDialog}
+            label={model.label}
+            disabled={model.disabled}
+            required={model.required}
+            styles={{ field: { cursor: 'pointer' }, icon: { fontSize: 12, color: Fluent.getTheme().palette.neutralSecondary } }}
+            value={labelB()} />
+          <Fluent.Dialog hidden={isDialogHiddenB()} dialogContentProps={{ title: model.label }} minWidth={500}>
+            <Fluent.DialogContent styles={{ innerContent: { height: 600 }, header: { height: 0 } }}>
+              <Fluent.SearchBox data-test={`${model.name}-search`} onChange={onSearchChange} placeholder={model.placeholder} />
+              <Fluent.Text variant='small' styles={{ root: { marginTop: 32, float: 'right' } }} block>
+                <Fluent.Link onClick={selectAll}>Select All</Fluent.Link> | <Fluent.Link onClick={deselectAll}>Deselect All</Fluent.Link>
+              </Fluent.Text>
+              <Fluent.ScrollablePane styles={{ root: { top: 90 }, stickyAbove: { display: 'none' } }}>
+                <Fluent.DetailsList
+                  items={filteredItemsB()}
+                  styles={{ headerWrapper: { display: 'none' }, root: { overflowY: 'auto' } }}
+                  columns={[{ key: 'label', name: 'Option', minWidth: 200, fieldName: 'text' }]}
+                  selection={selection}
+                  selectionMode={isMultivalued ? Fluent.SelectionMode.multiple : Fluent.SelectionMode.single}
+                  checkboxVisibility={Fluent.CheckboxVisibility.always}
+                  onRenderDetailsHeader={onRenderDetailsHeader}
+                />
+              </Fluent.ScrollablePane>
+            </Fluent.DialogContent>
+            <Fluent.DialogFooter>
+              <Fluent.DefaultButton text='Cancel' onClick={cancelDialog} />
+              <Fluent.PrimaryButton text='Select' onClick={submit} />
+            </Fluent.DialogFooter>
+          </Fluent.Dialog>
+        </>
+      )
+    return { init, render, isDialogHiddenB, filteredItemsB, labelB, initialSelectionB }
+  })
+
+export const
+  XDropdown = bond(({ model: m }: { model: Dropdown }) => {
+    const isMultivalued = !!m.values
+    // TODO: Consider setting args only if value / values are included in choices. 
+    wave.args[m.name] = isMultivalued
+      ? (m.values || [])
+      : (m.value || null)
+
+    const
+      render = () => (
+        <div style={displayMixin(m.visible)}>
+          {
+            (m.choices || []).length > 100
+              ? <DialogDropdown model={m} isMultivalued={isMultivalued} />
+              : <BaseDropdown model={m} isMultivalued={isMultivalued} />
+          }
+        </div>
+      )
+
+    return { render }
   })
