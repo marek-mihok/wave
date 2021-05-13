@@ -148,11 +148,9 @@ const
         toggleDialog()
         initialSelectionB([...selection.getSelection().map(({ key }) => key as S)])
       },
-      selectAll = () => model.choices?.forEach(({ name }) => selection.setKeySelected(name, true, false)),
-      deselectAll = () => model.choices?.forEach(({ name }) => selection.setKeySelected(name, false, false)),
+      selectAll = () => selection.setAllSelected(true),
+      deselectAll = () => selection.setAllSelected(false),
       onSearchChange = (_e?: React.ChangeEvent<HTMLInputElement>, newVal = '') => filteredItemsB(items.filter(({ text }) => fuzzysearch(text, newVal))),
-      onRenderDetailsHeader = (props?: Fluent.IDetailsHeaderProps, defaultRender?: (props?: Fluent.IDetailsHeaderProps) => JSX.Element | null): JSX.Element | null =>
-        !props || !defaultRender ? null : <Fluent.Sticky stickyPosition={Fluent.StickyPositionType.Header} isScrollSynced>{defaultRender(props)}</Fluent.Sticky>,
       init = () => {
         if (!model.values?.length && !model.value) return
 
@@ -196,7 +194,6 @@ const
                   selection={selection}
                   selectionMode={isMultivalued ? Fluent.SelectionMode.multiple : Fluent.SelectionMode.single}
                   checkboxVisibility={Fluent.CheckboxVisibility.always}
-                  onRenderDetailsHeader={onRenderDetailsHeader}
                 />
               </Fluent.ScrollablePane>
             </Fluent.DialogContent>
