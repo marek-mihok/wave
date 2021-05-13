@@ -59,6 +59,8 @@ export interface Dropdown {
 }
 
 const
+  MAX_DIALOG_WIDTH = 1000,
+  MIN_DIALOG_WIDTH = 500,
   BaseDropdown = bond(({ model, isMultivalued }: { model: Dropdown, isMultivalued: B }) => {
     const
       selection = isMultivalued ? new Set<S>(model.values) : null,
@@ -132,8 +134,15 @@ const
       selection = new Fluent.Selection<Fluent.IObjectWithKey & { text?: S }>({ items }),
       initialSelectionB = box<S[]>([]),
       filteredItemsB = box(items),
+      minWidth = Math.min(MAX_DIALOG_WIDTH, items.reduce((width, { text }) => Math.max(width, text.length * 9), MIN_DIALOG_WIDTH)),
       labelB = box(''),
-      toggleDialog = () => isDialogHiddenB(!isDialogHiddenB()),
+      toggleDialog = () => {
+        const isHidden = isDialogHiddenB()
+        if (isHidden) {
+          filteredItemsB(items)
+        }
+        isDialogHiddenB(!isHidden)
+      },
       cancelDialog = () => {
         isDialogHiddenB(true)
         selection.setAllSelected(false)
@@ -144,7 +153,7 @@ const
         wave.args[model.name] = result.length === 1 ? result[0] : result
 
         if (model.trigger) wave.sync()
-        labelB(selection.getSelectedCount() ? selection.getSelection().map(({ text }) => text).join(', ') : 'Select ...')
+        labelB(selection.getSelectedCount() ? selection.getSelection().map(({ text }) => text).join(', ') : '')
         toggleDialog()
         initialSelectionB([...selection.getSelection().map(({ key }) => key as S)])
       },
@@ -180,7 +189,7 @@ const
             required={model.required}
             styles={{ field: { cursor: 'pointer' }, icon: { fontSize: 12, color: Fluent.getTheme().palette.neutralSecondary } }}
             value={labelB()} />
-          <Fluent.Dialog hidden={isDialogHiddenB()} dialogContentProps={{ title: model.label }} minWidth={500}>
+          <Fluent.Dialog hidden={isDialogHiddenB()} dialogContentProps={{ title: model.label }} minWidth={minWidth}>
             <Fluent.DialogContent styles={{ innerContent: { height: 600 }, header: { height: 0 } }}>
               <Fluent.SearchBox data-test={`${model.name}-search`} onChange={onSearchChange} placeholder={model.placeholder} />
               <Fluent.Text variant='small' styles={{ root: { marginTop: 32, float: 'right' } }} block>
