@@ -3542,6 +3542,7 @@ def wide_info_card(
         box: str,
         title: str,
         caption: str,
+        subtitle: Optional[str] = None,
         icon: Optional[str] = None,
         image: Optional[str] = None,
         category: Optional[str] = None,
@@ -3554,7 +3555,8 @@ def wide_info_card(
     Args:
         box: A string indicating how to place this component on the page.
         title: The card's title.
-        caption: The card's caption, displayed below the title.
+        caption: The card's caption, displayed below the subtitle, supports markdown.
+        subtitle: The card's subtitle, displayed below the title.
         icon: The card's icon.
         image: The card’s image.
         category: The card's category, displayed above the title.
@@ -3568,6 +3570,7 @@ def wide_info_card(
         box,
         title,
         caption,
+        subtitle,
         icon,
         image,
         category,
